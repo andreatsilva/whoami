@@ -20,4 +20,5 @@ dialog{width:350px;max-width:calc(100% - 35px);background:var(--bg);border:1px s
 @media print{.site-header,#intro,.navigator,.ambient,footer,.workspace-top,.terminal-title,.command-dock,dialog{display:none!important}body{background:white;color:black;font-size:11pt}body:before{display:none}.workspace{display:block;height:auto}#portfolio{display:block!important;max-width:none;margin:0}.terminal,.terminal-scroll{overflow:visible;padding:0;border:0}.hero-graphic{display:none}.record{break-inside:avoid}}
 /* Compact desktops retain the header and command dock within the viewport. */
 body{display:flow-root}
+.terminal-scroll{scrollbar-gutter:stable}
 @media(min-width:681px) and (max-height:850px){.workspace{height:max(420px,calc(100svh - 221px))}.intro-grid{min-height:520px}.intro-art{height:480px}#intro{margin-top:30px}}
