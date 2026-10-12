@@ -1,1 +1,1 @@
-{"name":"andre-silva-web-cv","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node preview.mjs","check":"node --check dist/app.js"}}
+{"name":"andre-silva-web-cv","version":"2.0.0","private":true,"type":"module","scripts":{"start":"node preview.mjs","check":"node --check dist/app.js && node --check dist/controller.js && node --check dist/motion.js","sync-pages":"node sync-pages.mjs"}}
