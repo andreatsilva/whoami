@@ -1,0 +1,1 @@
+{"name":"andre-silva-web-cv","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node preview.mjs","check":"node --check dist/app.js"}}

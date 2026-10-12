@@ -1,0 +1,5 @@
+qa/
+*.zip
+node_modules/
+.env
+*.log
