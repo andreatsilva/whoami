@@ -1,0 +1,59 @@
+/* Typed palette values blend once at the root, including inherited SVG strokes. */
+@property --bg { syntax: '<color>'; inherits: true; initial-value: #0c0d0b; }
+@property --fg { syntax: '<color>'; inherits: true; initial-value: #d9d7be; }
+@property --dim { syntax: '<color>'; inherits: true; initial-value: #858778; }
+@property --line { syntax: '<color>'; inherits: true; initial-value: #33372e; }
+@property --green { syntax: '<color>'; inherits: true; initial-value: #a4b695; }
+@property --red { syntax: '<color>'; inherits: true; initial-value: #c39978; }
+@property --panel { syntax: '<color>'; inherits: true; initial-value: #12150f; }
+@property --accent { syntax: '<color>'; inherits: true; initial-value: #d9d7be; }
+
+html.theme-shifting {
+  transition: --bg 620ms ease, --fg 620ms ease, --dim 620ms ease,
+    --line 620ms ease, --green 620ms ease, --red 620ms ease,
+    --panel 620ms ease, --accent 620ms ease;
+}
+
+.terminal { position: relative; }
+.terminal-scan {
+  position: absolute;
+  top: 39px;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: left center;
+  background: linear-gradient(90deg, transparent, var(--green), var(--fg));
+}
+#content:focus { outline: none; }
+#current-path, #terminal-file { display: inline-block; }
+.enter { position: relative; overflow: hidden; transition: color .25s, background .25s, border-color .25s, transform .4s cubic-bezier(.22,1,.36,1); }
+.enter:hover { transform: translateY(-2px); }
+.enter > span:last-child { transition: transform .4s cubic-bezier(.22,1,.36,1); }
+.enter:hover > span:last-child { transform: translate(3px,-1px); }
+.enter:active { transform: translateY(0); }
+header nav a, .links a { text-decoration: none; }
+header nav a, .links a, .inline-button { transition: color .25s, border-color .25s, background-color .25s; }
+.links a { background: linear-gradient(var(--green),var(--green)) left bottom / 0 1px no-repeat; padding-bottom: 3px; transition: color .25s, background-size .35s cubic-bezier(.22,1,.36,1); }
+.links a:hover, .links a:focus-visible { background-size: 100% 1px; }
+.theme-option { transition: border-color .25s, background-color .25s, transform .3s cubic-bezier(.22,1,.36,1); }
+.theme-option:hover { transform: translateX(3px); }
+dialog[open]::backdrop { animation: backdrop-in .36s ease both; }
+dialog.closing::backdrop { animation: backdrop-out .16s ease both; }
+.mobile-nav span { transition: transform .35s cubic-bezier(.22,1,.36,1); }
+.mobile-nav[aria-expanded=true] span { transform: rotate(180deg); }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media(max-width:680px) {
+  .navigator.menu-moving { overflow: hidden; }
+  .terminal-scan { left: 0; right: 0; }
+}
+body.paused *, body.paused *::before, body.paused *::after { transition: none !important; animation: none !important; }
+body.paused dialog::backdrop { animation: none; }
+@media(prefers-reduced-motion:reduce) {
+  html.theme-shifting { transition: none; }
+  dialog[open]::backdrop { animation: none; }
+  .enter:hover, .enter:hover > span:last-child, .theme-option:hover { transform: none; }
+}

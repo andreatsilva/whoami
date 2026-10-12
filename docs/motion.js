@@ -7,10 +7,11 @@ function stroke(ctx,points,color,alpha,width=1,count=points.length){if(count<2)r
 
 export function createMotion(){
   let paused=false, intro=true, time=0, last=0, frame=0, startGrowth=0, section=0, colors={},pointer={x:0,y:0},smooth={x:0,y:0};
-  let surfaces=new Map(),lastPaint=0;
+  let surfaces=new Map(),lastPaint=0,colorUntil=0;
   const observer=new ResizeObserver(entries=>{for(const e of entries){const s=surfaces.get(e.target);if(s){s.w=e.contentRect.width;s.h=e.contentRect.height;s.dirty=true;}}request();});
   function attach(){for(const canvas of document.querySelectorAll('canvas')){if(surfaces.has(canvas))continue;const s={canvas,ctx:canvas.getContext('2d'),w:0,h:0,dirty:true};surfaces.set(canvas,s);observer.observe(canvas);}for(const [canvas] of surfaces)if(!canvas.isConnected){observer.unobserve(canvas);surfaces.delete(canvas);}refreshColors();}
-  function refreshColors(){const css=getComputedStyle(document.documentElement);for(const key of ['fg','dim','line','green','red','bg'])colors[key]=css.getPropertyValue('--'+key).trim();request();}
+  function readColors(){const css=getComputedStyle(document.documentElement);for(const key of ['fg','dim','line','green','red','bg'])colors[key]=css.getPropertyValue('--'+key).trim();}
+  function refreshColors(duration=0){colorUntil=Math.max(colorUntil,performance.now()+duration);readColors();request();}
   function prepare(s){if(s.w<1||s.h<1)return false;const dpr=Math.min(devicePixelRatio||1,2);if(s.dirty){s.canvas.width=Math.round(s.w*dpr);s.canvas.height=Math.round(s.h*dpr);s.dirty=false;}s.ctx.setTransform(dpr,0,0,dpr,0,0);s.ctx.clearRect(0,0,s.w,s.h);return true;}
   function dot(ctx,x,y,r,alpha=1,color=colors.fg){ctx.fillStyle=color;ctx.globalAlpha=alpha;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.globalAlpha=1;}
   function cross(ctx,x,y,size=3){ctx.strokeStyle=colors.line;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(x-size,y);ctx.lineTo(x+size,y);ctx.moveTo(x,y-size);ctx.lineTo(x,y+size);ctx.stroke();}
@@ -91,7 +92,7 @@ export function createMotion(){
     ctx.globalAlpha=.35;ctx.strokeStyle=colors.dim;ctx.beginPath();ctx.ellipse(w/2,h*.48,r*1.13,r*.25,-.35,0,TAU);ctx.stroke();ctx.globalAlpha=1;ctx.textAlign='start';cross(ctx,w/2,h-13,3);
   }
   function signal(s){const{ctx,w,h}=s;for(let i=0;i<35;i++){const value=(Math.sin(time*1.2-i*.32)+1)*.25+(Math.sin(i*1.7+time*.45)+1)*.16;const height=2+value*(h-5)*Math.exp(-(((i-18)/15)**2));ctx.fillStyle=i===section*4?colors.green:colors.fg;ctx.globalAlpha=.3+value*.4;ctx.fillRect(i*w/35,h-height,1,height);}ctx.globalAlpha=1;}
-  function draw(){if(!paused){smooth.x+=(pointer.x-smooth.x)*.045;smooth.y+=(pointer.y-smooth.y)*.045;}for(const s of surfaces.values()){
+  function draw(){if(colorUntil){readColors();if(performance.now()>=colorUntil)colorUntil=0;}if(!paused){smooth.x+=(pointer.x-smooth.x)*.045;smooth.y+=(pointer.y-smooth.y)*.045;}for(const s of surfaces.values()){
       const id=s.canvas.id;if((intro&&id!=='signature')||(!intro&&id==='signature')||!s.canvas.checkVisibility())continue;
       if(!prepare(s))continue;({signature,growth:garden,branch,orbit,signal}[id])?.(s);
     }}
