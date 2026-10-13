@@ -1,9 +1,11 @@
 // Choreography is separate from routing so interrupted navigation cannot commit stale content.
+import {createMatrixTransition} from './matrix.js';
 const ease = 'cubic-bezier(.22,1,.36,1)';
 const $ = selector => document.querySelector(selector);
 
 export function createTransitions(isStill) {
   const groups = new Map();
+  const matrix = createMatrixTransition(isStill);
   let routeId = 0, dialogId = 0, menuId = 0;
 
   function cancel(group) {
@@ -38,12 +40,12 @@ export function createTransitions(isStill) {
     ]);
   }
 
-  function workspaceIn() {
+  function workspaceIn(depth = false) {
     return Promise.all([
       play($('.workspace-top'), [{opacity: 0, clipPath: 'inset(0 100% 0 0)'}, {opacity: 1, clipPath: 'inset(0 0% 0 0)'}], {duration: 620}),
-      play($('.navigator'), [{opacity: 0, transform: 'translateX(-18px)'}, {opacity: 1, transform: 'translateX(0)'}], {delay: 70, duration: 650}),
-      rise($('.terminal'), 110, 18, 650),
-      rise($('.ambient'), 210, 12, 650),
+      play($('.navigator'), [{opacity: 0, transform: depth ? 'translateX(-38px) scale(.94)' : 'translateX(-18px)'}, {opacity: 1, transform: 'translateX(0) scale(1)'}], {delay: 70, duration: 750}),
+      play($('.terminal'), [{opacity: 0, transform: depth ? 'translateY(28px) scale(.965)' : 'translateY(18px)'}, {opacity: 1, transform: 'translateY(0) scale(1)'}], {delay: 110, duration: 750}),
+      play($('.ambient'), [{opacity: 0, transform: depth ? 'translateX(28px) translateY(14px)' : 'translateY(12px)'}, {opacity: 1, transform: 'translateX(0) translateY(0)'}], {delay: 210, duration: 750}),
       rise($('footer'), 270, 8, 520)
     ]);
   }
@@ -69,6 +71,7 @@ export function createTransitions(isStill) {
 
   async function route({initial, sceneChange, toIntro, direction, commit, unchanged}) {
     const id = ++routeId;
+    matrix.cancel();
     cancel('route');
     $('#content').removeAttribute('aria-busy');
     if (unchanged) return;
@@ -79,7 +82,24 @@ export function createTransitions(isStill) {
       return;
     }
     $('#content').setAttribute('aria-busy', 'true');
-    const outgoing = sceneChange ? $(toIntro ? '#portfolio' : '#intro') : $('#content');
+    if (sceneChange) {
+      const outgoing = $(toIntro ? '#portfolio' : '#intro');
+      let entrance = Promise.resolve();
+      // Change the page only when every code column has covered the viewport.
+      const curtain = matrix.run({toIntro, onCover() {
+        if (id !== routeId) return;
+        cancel('route');
+        commit();
+        entrance = toIntro ? introIn() : workspaceIn(true);
+      }});
+      play(outgoing, [{opacity: 1, transform: 'scale(1)'}, {opacity: .05, transform: toIntro ? 'scale(.95)' : 'scale(1.075)'}], {duration: 700, easing: 'cubic-bezier(.4,0,.2,1)'});
+      await curtain;
+      if (id !== routeId) return;
+      await entrance;
+      if (id === routeId) $('#content').removeAttribute('aria-busy');
+      return;
+    }
+    const outgoing = $('#content');
     let menuExit = Promise.resolve();
     const closingMenu = innerWidth <= 680 && $('.navigator').classList.contains('open');
     if (closingMenu) {
@@ -88,11 +108,11 @@ export function createTransitions(isStill) {
     }
     await Promise.all([menuExit, play(outgoing, [
       {opacity: 1, transform: 'translateY(0)'},
-      {opacity: 0, transform: `translateY(${sceneChange ? -12 : direction * -8}px)`}
-    ], {duration: closingMenu ? 320 : sceneChange ? 210 : 125, easing: 'cubic-bezier(.4,0,1,1)'})]);
+      {opacity: 0, transform: `translateY(${direction * -8}px)`}
+    ], {duration: closingMenu ? 320 : 125, easing: 'cubic-bezier(.4,0,1,1)'})]);
     if (id !== routeId) return;
     commit();
-    await (sceneChange ? (toIntro ? introIn() : workspaceIn()) : contentIn(direction));
+    await contentIn(direction);
     if (id === routeId) $('#content').removeAttribute('aria-busy');
   }
 
@@ -129,6 +149,7 @@ export function createTransitions(isStill) {
   }
 
   return {route, dialog, menu, closeMenu, finish() {
+    matrix.finish();
     // Finishing, rather than delaying or rejecting, also settles an in-flight route.
     for (const animations of groups.values()) for (const animation of animations) animation.finish();
   }};

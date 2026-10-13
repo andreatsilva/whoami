@@ -7,9 +7,11 @@ function stroke(ctx,points,color,alpha,width=1,count=points.length){if(count<2)r
 
 export function createMotion(){
   let paused=false, intro=true, time=0, last=0, frame=0, startGrowth=0, section=0, colors={},pointer={x:0,y:0},smooth={x:0,y:0};
-  let surfaces=new Map(),lastPaint=0,colorUntil=0;
+  let surfaces=new Map(),lastPaint=0,colorUntil=0,scrollDepth=0;
+  const rootStyle=document.documentElement.style,scroller=document.querySelector('.terminal-scroll');
+  const finePointer=matchMedia('(hover: hover) and (pointer: fine)');
   const observer=new ResizeObserver(entries=>{for(const e of entries){const s=surfaces.get(e.target);if(s){s.w=e.contentRect.width;s.h=e.contentRect.height;s.dirty=true;}}request();});
-  function attach(){for(const canvas of document.querySelectorAll('canvas')){if(surfaces.has(canvas))continue;const s={canvas,ctx:canvas.getContext('2d'),w:0,h:0,dirty:true};surfaces.set(canvas,s);observer.observe(canvas);}for(const [canvas] of surfaces)if(!canvas.isConnected){observer.unobserve(canvas);surfaces.delete(canvas);}refreshColors();}
+  function attach(){for(const canvas of document.querySelectorAll('#signature,#growth,#branch,#orbit,#signal')){if(surfaces.has(canvas))continue;const s={canvas,ctx:canvas.getContext('2d'),w:0,h:0,dirty:true};surfaces.set(canvas,s);observer.observe(canvas);}for(const [canvas] of surfaces)if(!canvas.isConnected){observer.unobserve(canvas);surfaces.delete(canvas);}refreshColors();}
   function readColors(){const css=getComputedStyle(document.documentElement);for(const key of ['fg','dim','line','green','red','bg'])colors[key]=css.getPropertyValue('--'+key).trim();}
   function refreshColors(duration=0){colorUntil=Math.max(colorUntil,performance.now()+duration);readColors();request();}
   function prepare(s){if(s.w<1||s.h<1)return false;const dpr=Math.min(devicePixelRatio||1,2);if(s.dirty){s.canvas.width=Math.round(s.w*dpr);s.canvas.height=Math.round(s.h*dpr);s.dirty=false;}s.ctx.setTransform(dpr,0,0,dpr,0,0);s.ctx.clearRect(0,0,s.w,s.h);return true;}
@@ -17,7 +19,7 @@ export function createMotion(){
   function cross(ctx,x,y,size=3){ctx.strokeStyle=colors.line;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(x-size,y);ctx.lineTo(x+size,y);ctx.moveTo(x,y-size);ctx.lineTo(x,y+size);ctx.stroke();}
   function signature(s){
     const{ctx,w,h}=s;const unit=Math.min(w,h*1.12),cx=w*.5,cy=h*.48;
-    ctx.save();ctx.translate(cx+smooth.x*9,cy+smooth.y*5);const rad=unit*.39;
+    ctx.save();ctx.translate(cx+smooth.x*3,cy+smooth.y*2);const rad=unit*.39;
     ctx.strokeStyle=colors.line;ctx.lineWidth=.5;ctx.setLineDash([1,6]);ctx.beginPath();ctx.ellipse(0,0,rad,rad*.78,-.22,0,TAU);ctx.stroke();ctx.setLineDash([]);
     for(let i=0;i<56;i++){const a=i/56*TAU;const r=rad*(1+.035*Math.sin(i));dot(ctx,Math.cos(a)*r,Math.sin(a)*r*.78,.6,.3);}
     // Three polyline strokes make an individual, open AS monogram.
@@ -92,15 +94,17 @@ export function createMotion(){
     ctx.globalAlpha=.35;ctx.strokeStyle=colors.dim;ctx.beginPath();ctx.ellipse(w/2,h*.48,r*1.13,r*.25,-.35,0,TAU);ctx.stroke();ctx.globalAlpha=1;ctx.textAlign='start';cross(ctx,w/2,h-13,3);
   }
   function signal(s){const{ctx,w,h}=s;for(let i=0;i<35;i++){const value=(Math.sin(time*1.2-i*.32)+1)*.25+(Math.sin(i*1.7+time*.45)+1)*.16;const height=2+value*(h-5)*Math.exp(-(((i-18)/15)**2));ctx.fillStyle=i===section*4?colors.green:colors.fg;ctx.globalAlpha=.3+value*.4;ctx.fillRect(i*w/35,h-height,1,height);}ctx.globalAlpha=1;}
-  function draw(){if(colorUntil){readColors();if(performance.now()>=colorUntil)colorUntil=0;}if(!paused){smooth.x+=(pointer.x-smooth.x)*.045;smooth.y+=(pointer.y-smooth.y)*.045;}for(const s of surfaces.values()){
+  function draw(){if(colorUntil){readColors();if(performance.now()>=colorUntil)colorUntil=0;}if(!paused){smooth.x+=(pointer.x-smooth.x)*.065;smooth.y+=(pointer.y-smooth.y)*.065;scrollDepth+=(Math.min(240,intro?scrollY:(innerWidth<=680?scrollY:scroller.scrollTop))-scrollDepth)*.1;rootStyle.setProperty('--parallax-x',smooth.x.toFixed(4));rootStyle.setProperty('--parallax-y',smooth.y.toFixed(4));rootStyle.setProperty('--scene-scroll',scrollDepth.toFixed(2)+'px');}for(const s of surfaces.values()){
       const id=s.canvas.id;if((intro&&id!=='signature')||(!intro&&id==='signature')||!s.canvas.checkVisibility())continue;
       if(!prepare(s))continue;({signature,growth:garden,branch,orbit,signal}[id])?.(s);
     }}
   function tick(now){frame=0;if(document.hidden)return;const delta=last?Math.min((now-last)/1000,.05):0;last=now;if(!paused)time+=delta;if(paused||now-lastPaint>=1000/30){draw();lastPaint=now;}if(!paused)frame=requestAnimationFrame(tick);}
   function request(){if(!frame&&!document.hidden){last=0;frame=requestAnimationFrame(tick);}}
-  document.addEventListener('pointermove',e=>{pointer.x=(e.clientX/innerWidth-.5)*2;pointer.y=(e.clientY/innerHeight-.5)*2;});
+  document.addEventListener('pointermove',e=>{if(!finePointer.matches||e.pointerType==='touch')return;pointer.x=clamp((e.clientX/innerWidth-.5)*2,-1,1);pointer.y=clamp((e.clientY/innerHeight-.5)*2,-1,1);},{passive:true});
+  document.documentElement.addEventListener('pointerleave',()=>{pointer={x:0,y:0};});
+  finePointer.addEventListener('change',()=>{pointer={x:0,y:0};});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;}else request();});
-  return {attach,refreshColors,setScene(value,index=0){intro=value;section=index;startGrowth=time;attach();request();},setPaused(value){paused=value;if(paused){cancelAnimationFrame(frame);frame=0;}request();},destroy(){cancelAnimationFrame(frame);observer.disconnect();surfaces.clear();}};
+  return {attach,refreshColors,setScene(value,index=0){intro=value;section=index;startGrowth=time;scrollDepth=0;rootStyle.setProperty('--scene-scroll','0px');attach();request();},setPaused(value){paused=value;document.body.classList.toggle('parallax-enabled',!value);if(paused){cancelAnimationFrame(frame);frame=0;rootStyle.setProperty('--parallax-x','0');rootStyle.setProperty('--parallax-y','0');rootStyle.setProperty('--scene-scroll','0px');}request();},destroy(){cancelAnimationFrame(frame);observer.disconnect();surfaces.clear();}};
 }
 
 export function navArt(index){
