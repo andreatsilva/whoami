@@ -1,6 +1,6 @@
 const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
 const hash = value => { const n = Math.sin(value * 127.1 + 311.7) * 43758.5453; return n - Math.floor(n); };
-const glyphs = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ<>/{}:=+';
+const glyphs = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ<>/{}:=+';
 
 export function createMatrixTransition(isStill) {
   const element = document.querySelector('#matrix-transition');
@@ -9,6 +9,13 @@ export function createMatrixTransition(isStill) {
   const ctx = canvas.getContext('2d');
   let frame = 0, job = null, width = 0, height = 0, ratio = 1;
   let pointer = {x: 0, y: 0}, drift = {x: 0, y: 0};
+  let palette = {}, fontFamily = '';
+
+  function readTheme() {
+    const style = getComputedStyle(document.documentElement);
+    for (const key of ['bg', 'fg', 'green', 'dim']) palette[key] = style.getPropertyValue(`--${key}`).trim();
+    fontFamily = getComputedStyle(document.body).fontFamily;
+  }
 
   function resize() {
     width = innerWidth; height = innerHeight; ratio = Math.min(devicePixelRatio || 1, 1.5);
@@ -42,19 +49,21 @@ export function createMatrixTransition(isStill) {
   }
 
   function stream(x, head, size, count, seed, clock, alpha, reverse = false) {
-    ctx.font = `${size}px 'Plex Mono', monospace`;
+    ctx.font = `${size}px ${fontFamily}`;
     const step = size * 1.28;
     for (let row = count - 1; row >= 0; row--) {
       const y = reverse ? height - head + row * step : head - row * step;
       if (y < -step || y > height + step) continue;
       const index = Math.floor(hash(seed * 71 + row * 13 + Math.floor(clock * (2 + hash(seed))) * 3) * glyphs.length);
       ctx.globalAlpha = alpha * (row === 0 ? 1 : Math.pow(1 - row / count, 1.65) * .72);
-      ctx.fillStyle = row === 0 ? '#d4ffdc' : row < 3 ? '#8df5aa' : '#44b878';
+      ctx.fillStyle = row === 0 ? palette.fg : row < 3 ? palette.green : palette.dim;
       ctx.fillText(glyphs[index], x, y);
     }
   }
 
   function draw(progress, elapsed) {
+    // Follow the same animated theme tokens as the page, including mid-wipe changes.
+    readTheme();
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, width, height);
     const reverse = job.toIntro;
@@ -73,7 +82,7 @@ export function createMatrixTransition(isStill) {
       const edge = clamp(front, 0, height);
       const left = col * cell;
       ctx.globalAlpha = 1;
-      ctx.fillStyle = '#050d08';
+      ctx.fillStyle = palette.bg;
       if (!revealing) {
         ctx.fillRect(left, reverse ? height - edge : 0, cell + 1, edge);
       } else {
