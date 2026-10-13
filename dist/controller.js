@@ -1,5 +1,7 @@
 import {createMotion,navArt} from './motion.js';
 import {createTransitions} from './transitions.js';
+import {createWheel} from './wheel.js';
+import {createReading} from './reading.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function boot(sections){
@@ -10,28 +12,32 @@ export function boot(sections){
   const files=['whoami.md','experience.log','selected-work/','homelab.conf','stack.conf','education.md','contact.vcf','appearance.conf'];
   function renderThemes(){for(const container of [$('#theme-options'),$('#inline-themes')]){if(!container)continue;if(!container.children.length)container.innerHTML=Object.entries(themes).map(([name,colors])=>`<button type="button" class="theme-option" data-theme-name="${name}"><span>${name}</span><span class="swatches">${colors.map(color=>`<i style="background:${color}"></i>`).join('')}</span></button>`).join('');container.querySelectorAll('[data-theme-name]').forEach(button=>button.setAttribute('aria-pressed',String(document.documentElement.dataset.theme===button.dataset.themeName)));}}
   function setTheme(name,animate=true){if(!themes[name])return;document.documentElement.classList.toggle('theme-shifting',animate&&!paused);document.documentElement.dataset.theme=name;document.querySelectorAll('.theme-name').forEach(x=>x.textContent=name);$('meta[name="theme-color"]').content=themes[name][0];try{localStorage.setItem('andre-theme',name)}catch{}renderThemes();motion.refreshColors(animate&&!paused?700:0);}
-  function setPaused(value){paused=value;document.body.classList.toggle('paused',value);document.documentElement.classList.toggle('theme-shifting',!value);document.querySelectorAll('.motion-button').forEach(button=>{button.textContent=`motion: ${value?'off':'on'}`;button.setAttribute('aria-pressed',String(value));});motion.setPaused(value);if(value){transitions.finish();motion.refreshColors();renderCode(true);}}
+  function setPaused(value){paused=value;document.body.classList.toggle('paused',value);document.documentElement.classList.toggle('theme-shifting',!value);document.querySelectorAll('.motion-button').forEach(button=>{button.textContent=`motion: ${value?'off':'on'}`;button.setAttribute('aria-pressed',String(value));});motion.setPaused(value);if(value){transitions.finish();wheelMotion.settle();reading.finish();motion.refreshColors();renderCode(true);}reading.refresh();}
   media.addEventListener('change',e=>setPaused(e.matches));
   $('#wheel').innerHTML=sections.map((s,i)=>`<button class="section-card" data-index="${i}" aria-label="${s.name}"><span class="card-art">${navArt(i)}</span><span class="card-label"><span>${s.name}</span><small>${String(i).padStart(2,'0')}</small></span></button>`).join('');
-  function wheel(){document.querySelectorAll('.section-card').forEach((button,i)=>{let offset=i-active;if(offset>4)offset-=8;if(offset< -3)offset+=8;button.style.transform=`translate(${offset*offset*4}px,${offset*102-45}px) rotate(${-offset*6}deg)`;button.style.opacity=String(Math.max(.13,1-Math.abs(offset)*.23));button.style.zIndex=String(5-Math.abs(offset));button.classList.toggle('selected',i===active);button.setAttribute('aria-current',i===active?'page':'false');});}
+  const wheelMotion=createWheel($('#wheel'),()=>paused),reading=createReading(()=>paused);
+  function wheel(){wheelMotion.select(active,displayedRoute===null||displayedRoute==='intro');}
   function route(){
     const id=location.hash.slice(1)||'intro',isIntro=id==='intro',previous=sections.findIndex(s=>s.id===displayedRoute);
     if(!isIntro){const index=sections.findIndex(s=>s.id===id);if(index<0){location.replace('#about');return;}active=index;wheel();}
     const index=active,initial=displayedRoute===null,sceneChange=(displayedRoute==='intro')!==isIntro,originFocus=document.activeElement;
+    reading.suspend();
     let distance=index-previous;if(distance>4)distance-=8;if(distance< -4)distance+=8;
     transitions.route({initial,sceneChange,toIntro:isIntro,direction:distance<0?-1:1,unchanged:id===displayedRoute,commit(){
-      const focused=document.activeElement,moveFocus=!initial&&(focused.closest('#intro,#content')||isIntro&&focused.closest('#portfolio')||innerWidth<=680&&originFocus.closest('#wheel'));
+      const focused=document.activeElement,moveFocus=!initial&&(focused.matches('.skip')||focused.closest('#intro,#content')||isIntro&&focused.closest('#portfolio')||innerWidth<=680&&originFocus.closest('#wheel'));
       $('#intro').hidden=!isIntro;$('#portfolio').hidden=isIntro;document.body.dataset.scene=isIntro?'intro':'portfolio';
       if(!isIntro){$('#content').innerHTML=sections[index].content();$('.terminal-scroll').scrollTop=0;$('#command').value='';$('#command-result').textContent='';$('#current-path').textContent=sections[index].name;$('#terminal-file').textContent=files[index];$('#section-count').textContent=`${String(index+1).padStart(2,'0')} / 08`;document.title=`André Silva — ${sections[index].name}`;transitions.closeMenu();renderThemes();}
       else document.title='André Silva — IT & Infrastructure';
       displayedRoute=id;motion.setScene(isIntro,index);window.scrollTo({top:0,behavior:'instant'});
       if(moveFocus)$(isIntro?'.enter':'#content').focus({preventScroll:true});
-    }});
+      reading.refresh();
+    }}).then(()=>{if(displayedRoute===id)reading.refresh();});
   }
   function navigate(delta){location.hash=sections[(active+delta+sections.length)%sections.length].id;}
   addEventListener('hashchange',route);
   document.addEventListener('click',async event=>{
-    const card=event.target.closest('[data-index]');if(card){if(suppressClick){suppressClick=false;return;}location.hash=sections[Number(card.dataset.index)].id;return;}
+    if(event.target.closest('.skip')&&displayedRoute==='about'&&location.hash==='#about'){event.preventDefault();$('#content').focus({preventScroll:true});$('.terminal-scroll').scrollTop=0;window.scrollTo({top:0,behavior:'instant'});reading.refresh();return;}
+    const card=event.target.closest('[data-index]');if(card){if(suppressClick){suppressClick=false;return;}const id=sections[Number(card.dataset.index)].id;if(innerWidth<=680&&id===displayedRoute&&location.hash===`#${id}`){$('.mobile-nav').setAttribute('aria-expanded','false');await transitions.menu(false);if(displayedRoute===id)$('#content').focus({preventScroll:true});}else location.hash=id;return;}
     if(event.target.closest('.theme-button')){renderThemes();transitions.dialog(true);}
     const theme=event.target.closest('[data-theme-name]');if(theme)setTheme(theme.dataset.themeName);
     if(event.target.closest('.motion-button'))setPaused(!paused);

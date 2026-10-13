@@ -15,6 +15,14 @@ html.theme-shifting {
 }
 
 .terminal { position: relative; }
+.reading-progress { position: absolute; top: 39px; left: 24px; right: 24px; height: 1px; pointer-events: none; background: var(--line); }
+.reading-progress i { display: block; height: 100%; background: var(--green); opacity: .5; transform: scaleX(0); transform-origin: left; transition: transform .18s linear; }
+#read-position { display: inline-block; min-width: 30px; margin-left: 0; margin-right: 12px; color: var(--green); font-variant-numeric: tabular-nums; }
+.section-card { transition: border-color .25s, background .25s; }
+.section-card .card-art svg { transition: transform .45s cubic-bezier(.22,1,.36,1); }
+.section-card:hover .card-art svg { transform: scale(1.06); }
+.record, .stack-row { transition: border-color .3s; }
+.record:hover, .stack-row:hover { border-color: var(--dim); }
 .terminal-scan {
   position: absolute;
   top: 39px;
@@ -49,11 +57,13 @@ dialog.closing::backdrop { animation: backdrop-out .16s ease both; }
 @media(max-width:680px) {
   .navigator.menu-moving { overflow: hidden; }
   .terminal-scan { left: 0; right: 0; }
+  .reading-progress { left: 0; right: 0; }
 }
 body.paused *, body.paused *::before, body.paused *::after { transition: none !important; animation: none !important; }
 body.paused dialog::backdrop { animation: none; }
+body.paused .section-card:hover .card-art svg, body.paused .enter:hover, body.paused .enter:hover > span:last-child, body.paused .theme-option:hover { transform: none; }
 @media(prefers-reduced-motion:reduce) {
   html.theme-shifting { transition: none; }
   dialog[open]::backdrop { animation: none; }
-  .enter:hover, .enter:hover > span:last-child, .theme-option:hover { transform: none; }
+  .enter:hover, .enter:hover > span:last-child, .theme-option:hover, .section-card:hover .card-art svg { transform: none; }
 }
