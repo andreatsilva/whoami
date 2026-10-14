@@ -64,11 +64,33 @@ export function boot(sections){
     $('#command').value='';
   });
   const snippets=[['const andre = {','  basedIn: "Lisbon, Portugal",','  experience: "6+ years",','  focus: ["people", "systems"],','  always: "learning"','};'],['const infrastructure = [','  "Microsoft 365", "Entra ID",','  "Intune", "Active Directory",','  "Fortinet", "Ubiquiti"','];','','connect(people, systems);'],['const build = {','  languages: ["C#", "JS", "Python"],','  tools: ["Docker", "Git"],','  process: "test, learn, improve"','};','','await build.somethingUseful();']];
-  let snippet=0,typed=28,hold=0;
-  function renderCode(full=false){const lines=snippets[snippet],code=lines.join('\n');const visible=full?code:code.slice(0,typed);$('#code').innerHTML=visible.split('\n').map((line,i)=>`<span class="code-row"><i>${String(i+1).padStart(2,'0')}</i>${escape(line).replace(/(&quot;.*?&quot;)/g,'<span class="string">$1</span>').replace(/\b(const|await)\b/g,'<span class="keyword">$1</span>')}</span>`).join('');$('#cursor-position').textContent=`${visible.split('\n').length}:${(visible.split('\n').at(-1)||'').length+1}`;}
+  let snippet=0,typed=28,hold=0,codePhase='type';
+  function renderCode(full=false){
+    const code=snippets[snippet].join('\n');
+    if(full){typed=code.length;codePhase='hold';hold=55;}
+    const visible=code.slice(0,typed),rows=visible.split('\n'),panel=$('#code');
+    panel.innerHTML=rows.map((line,i)=>`<span class="code-row${i===rows.length-1?' active':''}"><i>${String(i+1).padStart(2,'0')}</i>${escape(line).replace(/(&quot;.*?&quot;)/g,'<span class="string">$1</span>').replace(/\b(const|await)\b/g,'<span class="keyword">$1</span>')}</span>`).join('');
+    $('#cursor-position').textContent=`${rows.length}:${rows.at(-1).length+1}`;
+    // Keep the current line visible without moving the surrounding page.
+    panel.scrollTop=Math.max(0,panel.scrollHeight-panel.clientHeight);
+  }
   const formatter=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Lisbon',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   function clock(){const now=new Date();$('#clock').textContent=formatter.format(now);$('#clock').dateTime=now.toISOString();}
-  setInterval(()=>{if(paused||document.hidden||$('#intro').hidden)return;const length=snippets[snippet].join('\n').length;if(typed<length){typed+=2;renderCode();}else if(++hold>32){snippet=(snippet+1)%snippets.length;typed=0;hold=0;}},80);
+  setInterval(()=>{
+    if(paused||document.hidden||$('#intro').hidden)return;
+    if(hold>0){hold--;return;}
+    const code=snippets[snippet].join('\n');
+    if(codePhase==='type'){
+      typed=Math.min(typed+1,code.length);renderCode();
+      const character=code[typed-1];
+      hold=character==='\n'?5:character===','||character===';'?2:0;
+      if(typed===code.length){codePhase='hold';hold=55;}
+    }else if(codePhase==='hold'){codePhase='erase';}
+    else{
+      typed=Math.max(0,typed-4);renderCode();
+      if(typed===0){snippet=(snippet+1)%snippets.length;codePhase='type';hold=8;}
+    }
+  },45);
   setInterval(()=>{if(!document.hidden)clock();},1000);
   let savedTheme='blackmoney';try{const stored=localStorage.getItem('andre-theme');if(themes[stored])savedTheme=stored;}catch{}
   renderCode(paused);setTheme(savedTheme,false);setPaused(paused);clock();route();

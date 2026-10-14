@@ -7,7 +7,7 @@ function stroke(ctx,points,color,alpha,width=1,count=points.length){if(count<2)r
 
 export function createMotion(){
   let paused=false, intro=true, time=0, last=0, frame=0, startGrowth=0, section=0, colors={},pointer={x:0,y:0},smooth={x:0,y:0};
-  let surfaces=new Map(),lastPaint=0,colorUntil=0,scrollDepth=0;
+  let surfaces=new Map(),lastPaint=0,colorUntil=0,scrollDepth=0,startSignature=0;
   const rootStyle=document.documentElement.style,scroller=document.querySelector('.terminal-scroll');
   const finePointer=matchMedia('(hover: hover) and (pointer: fine)');
   const observer=new ResizeObserver(entries=>{for(const e of entries){const s=surfaces.get(e.target);if(s){s.w=e.contentRect.width;s.h=e.contentRect.height;s.dirty=true;}}request();});
@@ -18,7 +18,23 @@ export function createMotion(){
   function dot(ctx,x,y,r,alpha=1,color=colors.fg){ctx.fillStyle=color;ctx.globalAlpha=alpha;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.globalAlpha=1;}
   function cross(ctx,x,y,size=3){ctx.strokeStyle=colors.line;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(x-size,y);ctx.lineTo(x+size,y);ctx.moveTo(x,y-size);ctx.lineTo(x,y+size);ctx.stroke();}
   function signature(s){
-    const{ctx,w,h}=s;const unit=Math.min(w,h*1.12),cx=w*.5,cy=h*.48;
+    const{ctx,w,h}=s;const unit=Math.min(w,h*1.12),cx=w*.5,cy=h*.48,age=time-startSignature;
+    const settle=paused?1:clamp(age/2.8),phase=paused?0:time;
+    // Sparse registration marks and an orbital sweep sit behind the letter strokes.
+    ctx.save();ctx.translate(cx-smooth.x*5,cy-smooth.y*4);
+    const ring=unit*.435,rotation=phase*.085;
+    for(let i=0;i<96;i++){
+      const a=i/96*TAU,major=i%8===0,length=major?6:2;
+      const activity=Math.pow((Math.cos(a-rotation)+1)/2,18);
+      stroke(ctx,[{x:Math.cos(a)*ring,y:Math.sin(a)*ring*.78},{x:Math.cos(a)*(ring+length),y:Math.sin(a)*(ring+length)*.78}],major?colors.dim:colors.line,(.25+activity*.45)*settle,.65);
+    }
+    for(let lane=0;lane<2;lane++){
+      const radius=ring*(lane?1.065:.955),angle=(lane?-phase*.065:rotation)+lane*Math.PI;
+      ctx.strokeStyle=colors.green;ctx.globalAlpha=(lane?.22:.42)*settle;ctx.lineWidth=.7;
+      ctx.beginPath();ctx.ellipse(0,0,radius,radius*.78,0,angle,angle+.34);ctx.stroke();
+      dot(ctx,Math.cos(angle+.34)*radius,Math.sin(angle+.34)*radius*.78,1.25,.7*settle,colors.green);
+    }
+    ctx.globalAlpha=1;ctx.restore();
     ctx.save();ctx.translate(cx+smooth.x*3,cy+smooth.y*2);const rad=unit*.39;
     ctx.strokeStyle=colors.line;ctx.lineWidth=.5;ctx.setLineDash([1,6]);ctx.beginPath();ctx.ellipse(0,0,rad,rad*.78,-.22,0,TAU);ctx.stroke();ctx.setLineDash([]);
     for(let i=0;i<56;i++){const a=i/56*TAU;const r=rad*(1+.035*Math.sin(i));dot(ctx,Math.cos(a)*r,Math.sin(a)*r*.78,.6,.3);}
@@ -31,9 +47,12 @@ export function createMotion(){
           const t=k/19,shift=(j-8.5)*.0045;const flutter=Math.sin(time*.55+j*.4+t*2+p)*.0025*Math.sin(t*Math.PI);
           points.push({x:(mix(line[i][0],line[i+1][0],t)-.5+shift+flutter)*unit*.95,y:(mix(line[i][1],line[i+1][1],t)-.5+shift*.65)*unit*.95});
         }
-        const reveal=paused?1:clamp((time-j*.035-p*.15)/2.6);
+        const reveal=paused?1:clamp((age-j*.035-p*.15)/2.6);
         stroke(ctx,points,j%5===0?colors.green:colors.fg,.22+(j%4)*.03,.7,Math.floor(points.length*reveal));
-        if(reveal===1&&j%4===0){const idx=Math.floor(((time*.055+j*.11)%1)*(points.length-1));const point=points[idx];dot(ctx,point.x,point.y,1,.85);}
+        if(reveal===1&&j%6===0){
+          const idx=Math.floor(((phase*.055+j*.11)%1)*(points.length-1));
+          for(let tail=5;tail>=0;tail--){const point=points[Math.max(0,idx-tail)];dot(ctx,point.x,point.y,tail? .7:1.2,(1-tail/6)*.75,colors.green);}
+        }
       }
     }
     const rand=random(903);
@@ -41,7 +60,17 @@ export function createMotion(){
       const a=rand()*TAU,r=unit*(.3+rand()*.19),x=Math.cos(a)*r,y=Math.sin(a)*r*.75;
       const inner=unit*.23;const points=[];
       for(let j=0;j<=20;j++){let t=j/20;points.push(bezier({x:Math.cos(a)*inner,y:Math.sin(a)*inner*.7},{x:x*.65,y:y*.2},{x:x*.92+Math.sin(time*.3+i)*2,y:y*.8},{x,y},t));}
-      stroke(ctx,points,colors.fg,.05+rand()*.1,.55);dot(ctx,x,y,rand()>.85?1.4:.6,.45);
+      const alpha=.05+rand()*.1,nodeSize=rand()>.85?1.4:.6;
+      const grown=paused?1:clamp((age-.5-i*.012)/1.8);
+      stroke(ctx,points,colors.fg,alpha,.55,Math.floor(points.length*grown));
+      dot(ctx,x,y,nodeSize,.35*grown);
+      if(grown===1&&i%6===0){
+        const travel=(phase*.16+i*.137)%1,index=Math.floor(travel*(points.length-1));
+        for(let tail=3;tail>=0;tail--){const point=points[Math.max(0,index-tail)];dot(ctx,point.x,point.y,tail?.6:1.1,(1-tail/4)*.65,colors.green);}
+        const pulse=clamp((travel-.7)/.3);
+        ctx.globalAlpha=(1-pulse)*pulse*.9;ctx.strokeStyle=colors.green;ctx.lineWidth=.6;
+        ctx.beginPath();ctx.arc(x,y,2+pulse*7,0,TAU);ctx.stroke();ctx.globalAlpha=1;
+      }
     }
     ctx.restore();cross(ctx,20,h*.5);cross(ctx,w-20,h*.5);cross(ctx,w*.5,52);cross(ctx,w*.5,h-50);
   }
@@ -104,7 +133,7 @@ export function createMotion(){
   document.documentElement.addEventListener('pointerleave',()=>{pointer={x:0,y:0};});
   finePointer.addEventListener('change',()=>{pointer={x:0,y:0};});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(frame);frame=0;}else request();});
-  return {attach,refreshColors,setScene(value,index=0){intro=value;section=index;startGrowth=time;scrollDepth=0;rootStyle.setProperty('--scene-scroll','0px');attach();request();},setPaused(value){paused=value;document.body.classList.toggle('parallax-enabled',!value);if(paused){cancelAnimationFrame(frame);frame=0;rootStyle.setProperty('--parallax-x','0');rootStyle.setProperty('--parallax-y','0');rootStyle.setProperty('--scene-scroll','0px');}request();},destroy(){cancelAnimationFrame(frame);observer.disconnect();surfaces.clear();}};
+  return {attach,refreshColors,setScene(value,index=0){if(value&&!intro)startSignature=time;intro=value;section=index;startGrowth=time;scrollDepth=0;rootStyle.setProperty('--scene-scroll','0px');attach();request();},setPaused(value){paused=value;document.body.classList.toggle('parallax-enabled',!value);if(paused){cancelAnimationFrame(frame);frame=0;rootStyle.setProperty('--parallax-x','0');rootStyle.setProperty('--parallax-y','0');rootStyle.setProperty('--scene-scroll','0px');}request();},destroy(){cancelAnimationFrame(frame);observer.disconnect();surfaces.clear();}};
 }
 
 export function navArt(index){
